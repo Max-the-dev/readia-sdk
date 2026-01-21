@@ -37,29 +37,61 @@ The Readia SDK enables developers to integrate **x402-powered content commerce**
 
 ---
 
-## Quick Preview
+## Quick Start
+
+```bash
+npm install @readia/core
+```
 
 ```typescript
-import { Readia } from '@readia/sdk'
+import { ReadiaSDK } from '@readia/core'
+import { ExactScheme, FlexibleScheme } from '@readia/schemes'
+import { x402Middleware } from '@x402/server'
 
-// Initialize the SDK
-const readia = new Readia({
-  network: 'base',
-  apiKey: process.env.READIA_API_KEY
+// Initialize SDK with your platform config
+const readia = new ReadiaSDK({
+  // Your platform endpoints
+  baseUrl: 'https://api.yourplatform.com',
+  endpoints: {
+    content: '/api/content/:id',
+    purchase: '/api/content/:id/purchase',
+    publish: '/api/content/publish',
+  },
+
+  // Supported networks & payment assets
+  networks: {
+    base: ['USDC'],
+    solana: ['USDC', '$READ'],  // Custom token support
+    skale: ['USDC'],
+  },
+
+  // Platform wallets (for collecting fees)
+  wallets: {
+    base: '0x1234...abcd',
+    solana: 'ABC123...xyz',
+  },
+
+  // Payment schemes your platform supports
+  schemes: [ExactScheme, FlexibleScheme],
 })
 
-// Publish monetized content
-const article = await readia.publish({
-  title: 'Getting Started with Web3',
-  content: markdownContent,
-  price: 0.10  // $0.10 USDC
+// P2P payments - each content piece is its own x402 endpoint
+// Payments go directly from buyer -> creator, never touching platform
+readia.setPaymentRouting({
+  mode: 'direct',  // Funds go straight to creator wallet
+  payTo: (content) => content.creator.wallet,  // Dynamic per content
+  platformFee: 0,  // Optional: charge a platform fee
 })
 
-// Handle x402 payments automatically
-app.get('/article/:id', readia.paywall(), (req, res) => {
-  // Only reached after payment verification
-  res.json({ content: article.content })
+// Content rules for agent compatibility
+readia.setContentRules({
+  pricing: { min: 0.01, max: 10.00 },
+  required: ['title', 'content', 'category'],
+  categories: ['tech', 'science', 'culture'],
 })
+
+// Apply middleware - that's it!
+app.use(x402Middleware(readia))
 ```
 
 ---
